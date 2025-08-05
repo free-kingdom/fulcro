@@ -358,7 +358,10 @@
                        (-> class-or-factory meta :qualifier)
                        nil)
            queryid   (if (component-instance? class-or-factory)
-                       (get-query-id class-or-factory)
+                       ; hooked use-fulcro components are component instances, without comp/factory's :fulcro$queryid
+                       (or
+                         (get-query-id class-or-factory)
+                         (query-id class qualifier))
                        (query-id class qualifier))]
        (when (and class (has-query? class))
          (get-query-by-id state-map class queryid))))))
@@ -958,9 +961,8 @@
    (let [nspc (if (boolean (:ns &env))
                 (-> &env :ns :name str)
                 (name (ns-name *ns*)))
-         fqkw (keyword (str nspc) (name sym))
-         ]
-     `(let [o#     (dissoc (merge ~options {:componentName ~fqkw}) :ident :query)
+         fqkw (keyword (str nspc) (name sym))]
+     `(let [o#     (merge ~options {:componentName ~fqkw})
             ident# (:ident o#)
             ident# (cond
                      (= :constant ident#) (fn [~'_ ~'_] [:Constant/id ~fqkw])
@@ -969,6 +971,6 @@
                      :else (do
                              (log/error "corrupt ident on component " ~fqkw)
                              nil))
-            o#     (cond-> o#
+            o#     (cond-> (dissoc o# :ident :query)
                      ident# (assoc :ident ident#))]
         (def ~sym (nc ~query o#))))))
